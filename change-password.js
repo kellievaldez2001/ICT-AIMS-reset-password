@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../../config.js';
 import { resolveAdminLocation, resolveUserDashboardLocation } from './adminRoutes.js';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Elements
   const form = document.getElementById('change-password-form');
+  const currentPassword = document.getElementById('current-password');
   const newPassword = document.getElementById('new-password');
   const confirmPassword = document.getElementById('confirm-password');
   const submitBtn = document.getElementById('submit-btn');
@@ -122,11 +123,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     errorMessage.textContent = '';
     successMessage.textContent = '';
 
+    const currentPass = currentPassword.value.trim();
     const newPass = newPassword.value.trim();
     const confirmPass = confirmPassword.value.trim();
 
     // Validation
-    if (!newPass || !confirmPass) {
+    if (!currentPass || !newPass || !confirmPass) {
       errorMessage.textContent = 'Please fill in all fields.';
       return;
     }
@@ -161,10 +163,28 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
+    if (currentPass === newPass) {
+      errorMessage.textContent = 'New password must be different from current password.';
+      return;
+    }
+
     submitBtn.disabled = true;
     submitBtn.textContent = 'Changing Password...';
 
     try {
+      // Verify current password by attempting to sign in
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPass
+      });
+
+      if (signInError) {
+        errorMessage.textContent = 'Current password is incorrect.';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Change Password';
+        return;
+      }
+
       // Update password
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPass
